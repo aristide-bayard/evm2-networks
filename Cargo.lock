@@ -842,7 +842,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "base-common-chains"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-chains",
  "alloy-eips",
@@ -858,7 +858,7 @@ dependencies = [
 [[package]]
 name = "base-common-consensus"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -879,7 +879,7 @@ dependencies = [
 [[package]]
 name = "base-common-eip8130"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-primitives",
  "base-common-consensus",
@@ -889,7 +889,7 @@ dependencies = [
 [[package]]
 name = "base-common-evm"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -913,12 +913,12 @@ dependencies = [
 [[package]]
 name = "base-common-flz"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 
 [[package]]
 name = "base-common-genesis"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -936,7 +936,7 @@ dependencies = [
 [[package]]
 name = "base-common-l1-fees"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-primitives",
  "base-common-flz",
@@ -946,7 +946,7 @@ dependencies = [
 [[package]]
 name = "base-common-precompiles"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",
@@ -985,7 +985,7 @@ dependencies = [
 [[package]]
 name = "base-execution-eip8130"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -1005,12 +1005,12 @@ dependencies = [
 [[package]]
 name = "base-metrics"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 
 [[package]]
 name = "base-precompile-macros"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-primitives",
  "proc-macro2",
@@ -1021,7 +1021,7 @@ dependencies = [
 [[package]]
 name = "base-precompile-storage"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72#2aa8bc46e6b4272ef3bf0905e1a5660ee2525e72"
+source = "git+https://github.com/foundry-rs/base?rev=dc2c07d5438344ffe7159a50afc7a51448b8cde9#dc2c07d5438344ffe7159a50afc7a51448b8cde9"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",

@@ -8,7 +8,6 @@ They are not officially maintained by Tempo.
 
 - [`op-evm2`](crates/op) - OP Stack execution, including deposits, L1 data fees, and operator fees.
 - [`base-evm2`](crates/base) - Base execution, including deposits, native precompiles, and EIP-8130 transactions.
-- [`monad-evm2`](crates/monad) - Monad execution, including gas rules, staking, and reserve-balance tracking.
 
 ## License
 

@@ -2441,33 +2441,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "monad-evm2"
-version = "0.1.0"
-dependencies = [
- "alloy-consensus",
- "alloy-eips",
- "alloy-primitives",
- "alloy-sol-types",
- "evm2",
- "evm2-macros",
- "monad-revm",
- "revm",
-]
-
-[[package]]
-name = "monad-revm"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27654f9cc215f197ccf39165b6565d9099e65cd1b28314e07b241c6bc6731616"
-dependencies = [
- "alloy-sol-types",
- "auto_impl",
- "revm",
- "revm-interpreter",
- "serde",
-]
-
-[[package]]
 name = "nonmax"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

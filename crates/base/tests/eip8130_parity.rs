@@ -4,7 +4,7 @@ mod common;
 
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Address, B256, Bytes, U256, keccak256};
-use base_common_consensus::{Call, TxBaseConstants, TxBaseSigned, Predeploys, TxBase};
+use base_common_consensus::{Call, Predeploys, TxBase, TxBaseConstants, TxBaseSigned};
 use base_common_evm::{BaseTransaction, TxBaseExecutionMode, TxBaseTransactionParts};
 use base_common_genesis::BaseUpgrade;
 use base_evm2::{BaseTxEnvelope, precompiles::NONCE_MANAGER_ADDRESS};

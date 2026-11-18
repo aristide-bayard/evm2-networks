@@ -5,8 +5,8 @@
 
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, address};
+use base_common_base_tx::{IntrinsicGas, TxBaseGasSchedule};
 use base_common_consensus::{Predeploys, TxBaseConstants, TxBaseSigned};
-use base_common_base_tx::{TxBaseGasSchedule, IntrinsicGas};
 use base_common_genesis::BaseFeature;
 use base_common_precompiles::{NonceManagerStorage, TxContextStorage};
 use base_execution_base_tx::{
@@ -253,14 +253,7 @@ pub(crate) fn prepare_eip8130(
         TxContextStorage::new(ctx)
             .set_context(sender, payer, sender.into_word())
             .map_err(validation_error)?;
-        Ok(Resolved {
-            sender,
-            payer,
-            gas_limit: tx.gas_limit,
-            intrinsic,
-            pool,
-            bump_nonce,
-        })
+        Ok(Resolved { sender, payer, gas_limit: tx.gas_limit, intrinsic, pool, bump_nonce })
     });
     if let Some(error) = provider.take_host_error() {
         return Err(error.into());

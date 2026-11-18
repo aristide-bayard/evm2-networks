@@ -292,7 +292,7 @@ impl Transaction for BaseTxEnvelope {
 mod tests {
     use super::*;
     use alloy_primitives::{Address, Signature};
-    use base_common_consensus::{DEPOSIT_TX_TYPE_ID, BASE_TX_TYPE_ID, TxBase};
+    use base_common_consensus::{BASE_TX_TYPE_ID, DEPOSIT_TX_TYPE_ID, TxBase};
 
     fn sample_deposit() -> TxDeposit {
         TxDeposit {

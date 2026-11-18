@@ -1,7 +1,7 @@
 //! Base transaction registry.
 
 use alloy_consensus::{TxEip1559, TxEip2930, TxLegacy};
-use base_common_consensus::{DEPOSIT_TX_TYPE_ID, BASE_TX_TYPE_ID, TxDeposit};
+use base_common_consensus::{BASE_TX_TYPE_ID, DEPOSIT_TX_TYPE_ID, TxDeposit};
 use base_common_genesis::BaseFeature;
 use evm2::{
     SpecId, TxResult,
@@ -113,9 +113,7 @@ mod tests {
             assert!(!registry.contains(3), "EIP-4844 is not supported on Base");
             assert!(!registry.contains(BASE_TX_TYPE_ID));
         }
-        assert!(
-            base_tx_registry(BaseSpecId::new(BaseUpgrade::Everest)).contains(BASE_TX_TYPE_ID)
-        );
+        assert!(base_tx_registry(BaseSpecId::new(BaseUpgrade::Everest)).contains(BASE_TX_TYPE_ID));
     }
 
     #[test]
@@ -128,11 +126,8 @@ mod tests {
             BlockEnv::<BaseEvmTypes>::default(),
             InMemoryDB::default(),
         );
-        let tx = BaseTxEnvelope::from(TxBaseSigned::new(
-            TxBase::default(),
-            Bytes::new(),
-            Bytes::new(),
-        ));
+        let tx =
+            BaseTxEnvelope::from(TxBaseSigned::new(TxBase::default(), Bytes::new(), Bytes::new()));
         let result = evm.transact(&tx.with_signer(Address::ZERO)).map(|tx| tx.discard());
         assert_eq!(result, Err(HandlerError::UnsupportedTransactionType(BASE_TX_TYPE_ID)));
     }

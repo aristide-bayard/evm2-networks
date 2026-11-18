@@ -862,9 +862,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
+name = "base-common-base-tx"
+version = "0.0.0"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
+dependencies = [
+ "alloy-primitives",
+ "base-common-consensus",
+]
+
+[[package]]
 name = "base-common-chains"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-chains",
  "alloy-eips",
@@ -880,7 +889,7 @@ dependencies = [
 [[package]]
 name = "base-common-consensus"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -890,7 +899,6 @@ dependencies = [
  "alloy-rlp",
  "alloy-rpc-types-eth",
  "alloy-serde",
- "alloy-sol-types",
  "ambassador",
  "base-common-genesis",
  "reth-codecs 0.8.2",
@@ -902,19 +910,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "base-common-eip8130"
-version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
-dependencies = [
- "alloy-primitives",
- "base-common-consensus",
- "thiserror",
-]
-
-[[package]]
 name = "base-common-evm"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -927,7 +925,7 @@ dependencies = [
  "base-common-genesis",
  "base-common-l1-fees",
  "base-common-precompiles",
- "base-execution-eip8130",
+ "base-execution-base-tx",
  "base-metrics",
  "base-precompile-storage",
  "revm",
@@ -938,12 +936,12 @@ dependencies = [
 [[package]]
 name = "base-common-flz"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 
 [[package]]
 name = "base-common-genesis"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -961,7 +959,7 @@ dependencies = [
 [[package]]
 name = "base-common-l1-fees"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-primitives",
  "base-common-flz",
@@ -971,13 +969,13 @@ dependencies = [
 [[package]]
 name = "base-common-precompiles"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",
  "alloy-sol-types",
+ "base-common-base-tx",
  "base-common-chains",
- "base-common-eip8130",
  "base-common-genesis",
  "base-precompile-macros",
  "base-precompile-storage",
@@ -993,14 +991,14 @@ dependencies = [
  "alloy-evm",
  "alloy-primitives",
  "alloy-sol-types",
+ "base-common-base-tx",
  "base-common-chains",
  "base-common-consensus",
- "base-common-eip8130",
  "base-common-evm",
  "base-common-genesis",
  "base-common-l1-fees",
  "base-common-precompiles",
- "base-execution-eip8130",
+ "base-execution-base-tx",
  "base-precompile-storage",
  "evm2",
  "k256 0.14.0",
@@ -1008,34 +1006,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "base-execution-eip8130"
+name = "base-execution-base-tx"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-primitives",
- "alloy-sol-types",
+ "base-common-base-tx",
  "base-common-consensus",
- "base-common-eip8130",
  "base-common-precompiles",
- "base-precompile-macros",
  "base-precompile-storage",
- "base64 0.22.1",
- "k256 0.13.4",
- "p256 0.13.2",
  "revm",
- "sha2 0.10.9",
  "thiserror",
 ]
 
 [[package]]
 name = "base-metrics"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 
 [[package]]
 name = "base-precompile-macros"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-primitives",
  "proc-macro2",
@@ -1046,7 +1038,7 @@ dependencies = [
 [[package]]
 name = "base-precompile-storage"
 version = "0.0.0"
-source = "git+https://github.com/foundry-rs/base?rev=cf040fa0d97828e9fa4c2a127b8048df19906803#cf040fa0d97828e9fa4c2a127b8048df19906803"
+source = "git+https://github.com/foundry-rs/base?rev=8d20ec38f386e91a56a13ff21020c6b61c3f8823#8d20ec38f386e91a56a13ff21020c6b61c3f8823"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",
@@ -1069,12 +1061,6 @@ name = "base16ct"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd307490d624467aa6f74b0eabb77633d1f758a7b25f12bceb0b22e08d9726f6"
-
-[[package]]
-name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64"
@@ -1552,7 +1538,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid 0.9.6",
- "pem-rfc7468",
  "zeroize",
 ]
 
@@ -1728,7 +1713,6 @@ dependencies = [
  "ff 0.13.1",
  "generic-array",
  "group 0.13.0",
- "pem-rfc7468",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
  "sec1 0.7.3",
@@ -2301,7 +2285,6 @@ dependencies = [
  "once_cell",
  "serdect 0.2.0",
  "sha2 0.10.9",
- "signature 2.2.0",
 ]
 
 [[package]]
@@ -2693,15 +2676,6 @@ name = "pastey"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
-
-[[package]]
-name = "pem-rfc7468"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88b39c9bfcfc231068454382784bb460aae594343fb030d46e9f50a645418412"
-dependencies = [
- "base64ct",
-]
 
 [[package]]
 name = "pest"
@@ -3694,7 +3668,7 @@ version = "3.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df9adc193c780ef8f159aee8b61e2d5801aaa555e6eb0947fe45530ec506296f"
 dependencies = [
- "base64 0.23.1",
+ "base64",
  "bs58",
  "chrono",
  "hex",

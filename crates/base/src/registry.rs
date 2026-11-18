@@ -1,7 +1,7 @@
 //! Base transaction registry.
 
 use alloy_consensus::{TxEip1559, TxEip2930, TxLegacy};
-use base_common_consensus::{DEPOSIT_TX_TYPE_ID, EIP8130_TX_TYPE_ID, TxDeposit};
+use base_common_consensus::{DEPOSIT_TX_TYPE_ID, BASE_TX_TYPE_ID, TxDeposit};
 use base_common_genesis::BaseFeature;
 use evm2::{
     SpecId, TxResult,
@@ -80,9 +80,9 @@ pub fn base_tx_registry(spec: BaseSpecId) -> TxRegistry<BaseEvmTypes, TxResult<B
             ),
         );
     }
-    if spec.is_feature_enabled(BaseFeature::Eip8130) {
+    if spec.is_feature_enabled(BaseFeature::TxBase) {
         registry.register(
-            EIP8130_TX_TYPE_ID,
+            BASE_TX_TYPE_ID,
             BaseTxEnvelope::as_eip8130,
             handler(prepare_eip8130, execute_eip8130),
         );
@@ -93,9 +93,9 @@ pub fn base_tx_registry(spec: BaseSpecId) -> TxRegistry<BaseEvmTypes, TxResult<B
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BaseEvmFactory, BaseUpgrade, Eip8130Signed};
+    use crate::{BaseEvmFactory, BaseUpgrade, TxBaseSigned};
     use alloy_primitives::{Address, Bytes};
-    use base_common_consensus::{EIP8130_TX_TYPE_ID, TxEip8130};
+    use base_common_consensus::{BASE_TX_TYPE_ID, TxBase};
     use evm2::{env::BlockEnv, evm::InMemoryDB, registry::HandlerError};
 
     #[test]
@@ -111,10 +111,10 @@ mod tests {
             }
             assert_eq!(registry.contains(4), eip7702, "EIP-7702 at {upgrade:?}");
             assert!(!registry.contains(3), "EIP-4844 is not supported on Base");
-            assert!(!registry.contains(EIP8130_TX_TYPE_ID));
+            assert!(!registry.contains(BASE_TX_TYPE_ID));
         }
         assert!(
-            base_tx_registry(BaseSpecId::new(BaseUpgrade::Everest)).contains(EIP8130_TX_TYPE_ID)
+            base_tx_registry(BaseSpecId::new(BaseUpgrade::Everest)).contains(BASE_TX_TYPE_ID)
         );
     }
 
@@ -128,12 +128,12 @@ mod tests {
             BlockEnv::<BaseEvmTypes>::default(),
             InMemoryDB::default(),
         );
-        let tx = BaseTxEnvelope::from(Eip8130Signed::new(
-            TxEip8130::default(),
+        let tx = BaseTxEnvelope::from(TxBaseSigned::new(
+            TxBase::default(),
             Bytes::new(),
             Bytes::new(),
         ));
         let result = evm.transact(&tx.with_signer(Address::ZERO)).map(|tx| tx.discard());
-        assert_eq!(result, Err(HandlerError::UnsupportedTransactionType(EIP8130_TX_TYPE_ID)));
+        assert_eq!(result, Err(HandlerError::UnsupportedTransactionType(BASE_TX_TYPE_ID)));
     }
 }

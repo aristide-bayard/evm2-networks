@@ -5,16 +5,12 @@
 
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, address};
-use alloy_sol_types::{SolError, sol};
-use base_common_consensus::{
-    AccountChange, Delegation, Eip8130Constants, Eip8130Signed, Predeploys,
-};
-use base_common_eip8130::{Eip8130GasSchedule, IntrinsicGas};
+use base_common_consensus::{Predeploys, TxBaseConstants, TxBaseSigned};
+use base_common_base_tx::{TxBaseGasSchedule, IntrinsicGas};
 use base_common_genesis::BaseFeature;
 use base_common_precompiles::{NonceManagerStorage, TxContextStorage};
-use base_execution_eip8130::{
-    AccountChangeApplier, AccountConfigurationStorage, ApplyError, DelegationEffect, FeeCheck,
-    FeeError, NonceMode, NonceValidator, ResolvedSender, TransactionAuthorizer,
+use base_execution_base_tx::{
+    FeeCheck, FeeError, NonceMode, NonceValidator, ResolvedSender, TransactionAuthorizer,
 };
 use base_precompile_storage::{BasePrecompileError, StorageCtx};
 use evm2::{
@@ -41,11 +37,6 @@ use crate::{
     storage::BaseStorageProvider,
 };
 
-sol! {
-    /// Reverted when a policy-gated actor dispatches to any other target.
-    error ActorPolicyViolation(bytes32 actorId, address target);
-}
-
 /// Payer published for an unsigned simulation whose payer cannot be resolved, like
 /// `base_common_evm::Eip8130Executor::UNSIGNED_OPEN_PAYER`.
 const UNSIGNED_OPEN_PAYER: Address = address!("0x0000000000000000000000000000000000008130");
@@ -62,9 +53,6 @@ pub(crate) struct PreparedEip8130 {
     encoded: Bytes,
     sender: Address,
     payer: Address,
-    actor: B256,
-    policy_gated: bool,
-    policy_target: Address,
     gas_limit: u64,
     intrinsic: u64,
     floor: u64,
@@ -83,9 +71,6 @@ pub(crate) struct PreparedEip8130 {
 struct Resolved {
     sender: Address,
     payer: Address,
-    actor: B256,
-    policy_gated: bool,
-    policy_target: Address,
     gas_limit: u64,
     intrinsic: IntrinsicGas,
     pool: u64,
@@ -109,7 +94,7 @@ pub struct Eip8130Root(RootState);
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum RootState {
     /// The calls to run under the root, with their call gas pool.
-    Pending(Box<(Eip8130Signed, PreparedEip8130, u64)>),
+    Pending(Box<(TxBaseSigned, PreparedEip8130, u64)>),
     /// The calls' outcome.
     Done(Box<CallsResult>),
 }
@@ -137,7 +122,7 @@ fn validation_error(error: impl Error + Send + Sync + 'static) -> HandlerError {
 /// Applies the pre-call pipeline. The registry's validation entry point runs the same pipeline
 /// and discards its writes, without dispatching any calls.
 pub(crate) fn prepare_eip8130(
-    req: &mut TxRequest<'_, '_, BaseEvmTypes, Eip8130Signed>,
+    req: &mut TxRequest<'_, '_, BaseEvmTypes, TxBaseSigned>,
 ) -> HandlerResult<PreparedEip8130> {
     let signed = *req.tx.inner();
     let tx = signed.tx();
@@ -152,7 +137,6 @@ pub(crate) fn prepare_eip8130(
         return Err(HandlerError::InvalidChainId { expected: chain_id, got: tx.chain_id });
     }
     let spec = host.config_spec_id();
-    let keystore = spec.is_feature_enabled(BaseFeature::Keystore);
     let gas_limit_billing = spec.is_feature_enabled(BaseFeature::GasLimitBilling);
     let fee_charge = host.feature(EvmFeatures::FEE_CHARGE);
     let gas_cap = host.version().tx_gas_limit_cap;
@@ -183,34 +167,28 @@ pub(crate) fn prepare_eip8130(
     };
     let mut provider = BaseStorageProvider::unmetered(host, Address::ZERO, origin);
     let resolved = StorageCtx::enter(&mut provider, |ctx| {
-        if let Some(hint) = simulation {
-            let payer_auth = IntrinsicGas::payer_auth_cost_of(signed).map_err(validation_error)?;
+        if simulation.is_some() {
+            let payer_auth = IntrinsicGas::payer_auth_cost_of(signed);
             let gas_limit = tx.gas_limit.min(gas_cap.saturating_sub(payer_auth));
             let payer = signed.resolved_payer(origin).unwrap_or(UNSIGNED_OPEN_PAYER);
-            if !keystore {
-                TransactionAuthorizer::check_without_keystore(signed).map_err(validation_error)?;
-            }
+            TransactionAuthorizer::check(signed).map_err(validation_error)?;
             let (intrinsic, pool) = execution_gas(signed, origin, gas_limit)?;
-            apply_simulated_changes(ctx, signed, origin, now)?;
-            if !tx.nonce_key.is_zero() && tx.nonce_key != Eip8130Constants::NONCE_KEY_MAX {
+            if let Some(delegation) =
+                TransactionAuthorizer::delegation(signed, origin).map_err(validation_error)?
+            {
+                delegation.install(ctx).map_err(validation_error)?;
+            }
+            if !tx.nonce_key.is_zero() && tx.nonce_key != TxBaseConstants::NONCE_KEY_MAX {
                 NonceManagerStorage::new(ctx)
                     .increment_nonce(origin, tx.nonce_key)
                     .map_err(validation_error)?;
             }
-            let actor = hint
-                .filter(|_| keystore)
-                .unwrap_or_else(|| AccountConfigurationStorage::self_actor_id(origin));
-            let (policy_gated, policy_target) =
-                if keystore { policy_gate(ctx, origin, actor)? } else { (false, Address::ZERO) };
             TxContextStorage::new(ctx)
-                .set_context(origin, payer, actor)
+                .set_context(origin, payer, origin.into_word())
                 .map_err(validation_error)?;
             return Ok(Resolved {
                 sender: origin,
                 payer,
-                actor,
-                policy_gated,
-                policy_target,
                 gas_limit,
                 intrinsic,
                 pool,
@@ -231,33 +209,15 @@ pub(crate) fn prepare_eip8130(
             now_ms,
         )
         .map_err(validation_error)?;
-        let mut acc = AccountConfigurationStorage::new(ctx);
-        let applied = if keystore {
-            TransactionAuthorizer::authorize_and_apply(
-                signed,
-                resolved_sender,
-                &mut acc,
-                chain_id,
-                now,
-            )
-        } else {
-            TransactionAuthorizer::authorize_without_keystore(signed, resolved_sender)
-        }
-        .map_err(validation_error)?;
-        let actor = applied.actors.sender.resolved;
-        let payer = applied.actors.payer.as_ref().map_or(sender, |p| p.account);
-        if !actor.can_use_nonce_key(tx.nonce_key) {
-            return Err(invalid("sender actor scope does not authorize sequenced nonces"));
-        }
-        if let Some(created) = &applied.applied.created {
-            install_created_code(ctx, created.address, &created.code)?;
-        }
-        if let Some(delegation) = &applied.applied.delegation {
+        let authorized =
+            TransactionAuthorizer::authorize(signed, resolved_sender).map_err(validation_error)?;
+        let payer = authorized.payer;
+        if let Some(delegation) = &authorized.delegation {
             delegation.install(ctx).map_err(validation_error)?;
         }
         // The nonce advances after the account changes, so a create sees the zero nonce.
         let mut nonces = NonceManagerStorage::new(ctx);
-        let bump_nonce = if tx.nonce_key == Eip8130Constants::NONCE_KEY_MAX {
+        let bump_nonce = if tx.nonce_key == TxBaseConstants::NONCE_KEY_MAX {
             nonces
                 .check_and_mark_expiring_nonce(tx.replay_id(sender), tx.valid_before_ms(), now_ms)
                 .map_err(validation_error)?;
@@ -291,14 +251,11 @@ pub(crate) fn prepare_eip8130(
             })?;
         }
         TxContextStorage::new(ctx)
-            .set_context(sender, payer, actor.actor_id)
+            .set_context(sender, payer, sender.into_word())
             .map_err(validation_error)?;
         Ok(Resolved {
             sender,
             payer,
-            actor: actor.actor_id,
-            policy_gated: actor.is_policy_gated(),
-            policy_target: actor.policy_target,
             gas_limit: tx.gas_limit,
             intrinsic,
             pool,
@@ -314,9 +271,6 @@ pub(crate) fn prepare_eip8130(
         encoded,
         sender: resolved.sender,
         payer: resolved.payer,
-        actor: resolved.actor,
-        policy_gated: resolved.policy_gated,
-        policy_target: resolved.policy_target,
         gas_limit: resolved.gas_limit,
         intrinsic: resolved.intrinsic.sender_intrinsic(),
         floor: resolved.intrinsic.sender_floor(),
@@ -360,7 +314,7 @@ pub(crate) fn prepare_eip8130(
 
 /// Executes the calls, retaining earlier committed phases after a later phase reverts.
 pub(crate) fn execute_eip8130(
-    req: TxRequest<'_, '_, BaseEvmTypes, Eip8130Signed>,
+    req: TxRequest<'_, '_, BaseEvmTypes, TxBaseSigned>,
     prepared: PreparedEip8130,
 ) -> HandlerResult<TxResult<BaseEvmTypes>> {
     let signed = *req.tx.inner();
@@ -474,7 +428,7 @@ fn creates_account(
 
 fn execute_calls(
     host: &mut BaseEvm<'_>,
-    signed: &Eip8130Signed,
+    signed: &TxBaseSigned,
     prepared: &PreparedEip8130,
     pool: u64,
     under_root: bool,
@@ -495,14 +449,6 @@ fn execute_calls(
         let mut phase_refund = 0i64;
         let mut failure = None;
         for call in phase {
-            if prepared.policy_gated && call.to != prepared.policy_target {
-                failure = Some(
-                    ActorPolicyViolation { actorId: prepared.actor, target: call.to }
-                        .abi_encode()
-                        .into(),
-                );
-                break;
-            }
             // The target is loaded and warmed inside the phase checkpoint, not the transaction
             // prewarm set.
             let access = root_call_access_gas(host, call.to, first_call)?;
@@ -513,7 +459,7 @@ fn execute_calls(
             };
             remaining = left;
             if creates_account(host, prepared.sender, call.to, call.value)? {
-                let Some(left) = remaining.checked_sub(Eip8130GasSchedule::NEW_ACCOUNT_COST) else {
+                let Some(left) = remaining.checked_sub(TxBaseGasSchedule::NEW_ACCOUNT_COST) else {
                     failure = Some(Bytes::new());
                     break;
                 };
@@ -570,7 +516,7 @@ fn execute_calls(
 
 fn probe(
     host: &mut BaseEvm<'_>,
-    signed: &Eip8130Signed,
+    signed: &TxBaseSigned,
     prepared: &PreparedEip8130,
     pool: u64,
 ) -> HandlerResult<CallsResult> {
@@ -584,7 +530,7 @@ fn probe(
 /// Runs the calls under a synthetic root message, so that inspectors trace them as its children.
 fn execute_root(
     host: &mut BaseEvm<'_>,
-    signed: &Eip8130Signed,
+    signed: &TxBaseSigned,
     prepared: &PreparedEip8130,
     pool: u64,
 ) -> HandlerResult<CallsResult> {
@@ -688,7 +634,7 @@ impl DynDatabase for HostDb<'_, '_> {
 /// Searches only verified-feasible pools, including the gas retained by nested EIP-150 calls.
 fn estimate_pool(
     host: &mut BaseEvm<'_>,
-    signed: &Eip8130Signed,
+    signed: &TxBaseSigned,
     prepared: &PreparedEip8130,
 ) -> HandlerResult<u64> {
     let ceiling = probe(host, signed, prepared, prepared.pool)?;
@@ -786,39 +732,13 @@ fn settle(
     Ok((l1, operator))
 }
 
-fn install_created_code(ctx: StorageCtx<'_>, address: Address, code: &Bytes) -> HandlerResult<()> {
-    let occupied = ctx
-        .with_account_info(address, |info| Ok(!info.is_empty_code_hash() || info.nonce != 0))
-        .map_err(validation_error)?;
-    if occupied {
-        return Err(invalid("create destination already has code or a non-zero nonce"));
-    }
-    let bytecode =
-        revm::state::Bytecode::new_raw_checked(code.clone()).map_err(validation_error)?;
-    ctx.set_code(address, bytecode).map_err(validation_error)
-}
-
-/// Resolves the simulated actor's policy gate, like the reference `simulate_policy_gate`.
-fn policy_gate(
-    ctx: StorageCtx<'_>,
-    sender: Address,
-    actor: B256,
-) -> HandlerResult<(bool, Address)> {
-    let acc = AccountConfigurationStorage::new(ctx);
-    let scope = acc.resolve_actor_config(sender, actor).map_err(validation_error)?.scope;
-    if !Eip8130Constants::sender_is_policy_gated(scope) {
-        return Ok((false, Address::ZERO));
-    }
-    Ok((true, acc.get_policy_manager(sender, actor).map_err(validation_error)?))
-}
-
 /// Computes the intrinsic gas and the gas left for the calls.
 fn execution_gas(
-    signed: &Eip8130Signed,
+    signed: &TxBaseSigned,
     sender: Address,
     gas_limit: u64,
 ) -> HandlerResult<(IntrinsicGas, u64)> {
-    let intrinsic = IntrinsicGas::compute(signed, sender).map_err(validation_error)?;
+    let intrinsic = IntrinsicGas::compute(signed, sender);
     if gas_limit < intrinsic.sender_floor() {
         return Err(invalid("gas limit is below the EIP-7623 calldata floor"));
     }
@@ -826,57 +746,4 @@ fn execution_gas(
         .execution_gas_available(gas_limit)
         .ok_or_else(|| invalid("gas limit is below intrinsic gas"))?;
     Ok((intrinsic, pool))
-}
-
-fn apply_simulated_changes(
-    ctx: StorageCtx<'_>,
-    signed: &Eip8130Signed,
-    sender: Address,
-    now: u64,
-) -> HandlerResult<()> {
-    let mut acc = AccountConfigurationStorage::new(ctx);
-    let mut created = None;
-    let mut delegation = None;
-    for (index, change) in signed.tx().account_changes.iter().enumerate() {
-        match change {
-            AccountChange::Create(entry) => {
-                if delegation.is_some() {
-                    return Err(validation_error(ApplyError::CreateAndDelegation));
-                }
-                if index != 0 || created.is_some() {
-                    return Err(validation_error(ApplyError::InvalidCreatePosition));
-                }
-                let effect = AccountChangeApplier::apply_create(&mut acc, entry)
-                    .map_err(validation_error)?;
-                created = Some(effect);
-            }
-            AccountChange::ConfigChange(change) => {
-                AccountChangeApplier::apply_config_change(
-                    &mut acc,
-                    sender,
-                    &change.changes,
-                    change.channel,
-                    change.sequence,
-                    now,
-                )
-                .map_err(validation_error)?;
-            }
-            AccountChange::Delegation(Delegation { target }) => {
-                if delegation.is_some() {
-                    return Err(validation_error(ApplyError::MultipleDelegations));
-                }
-                if created.is_some() {
-                    return Err(validation_error(ApplyError::CreateAndDelegation));
-                }
-                delegation = Some(DelegationEffect::new(sender, *target));
-            }
-        }
-    }
-    if let Some(created) = created {
-        install_created_code(ctx, created.address, &created.code)?;
-    }
-    if let Some(delegation) = delegation {
-        delegation.install(ctx).map_err(validation_error)?;
-    }
-    Ok(())
 }

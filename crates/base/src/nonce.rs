@@ -2,7 +2,7 @@
 
 use alloy_primitives::{Bytes, U256};
 use alloy_sol_types::{Panic, PanicKind, SolCall, SolError, SolInterface, sol};
-use base_common_eip8130::NonceManagerSlots;
+use base_common_base_tx::NonceManagerSlots;
 use evm2::{
     Evm, SpecId, Version,
     evm::precompile::PrecompileOutput,

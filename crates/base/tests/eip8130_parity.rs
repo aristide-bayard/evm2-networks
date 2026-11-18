@@ -4,8 +4,8 @@ mod common;
 
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Address, B256, Bytes, U256, keccak256};
-use base_common_consensus::{Call, Eip8130Constants, Eip8130Signed, Predeploys, TxEip8130};
-use base_common_evm::{BaseTransaction, Eip8130ExecutionMode, Eip8130TransactionParts};
+use base_common_consensus::{Call, TxBaseConstants, TxBaseSigned, Predeploys, TxBase};
+use base_common_evm::{BaseTransaction, TxBaseExecutionMode, TxBaseTransactionParts};
 use base_common_genesis::BaseUpgrade;
 use base_evm2::{BaseTxEnvelope, precompiles::NONCE_MANAGER_ADDRESS};
 use common::{CHAIN_ID, COINBASE, Compare, Env, Outcome, Seed, run_evm2_seq, run_revm_seq};
@@ -17,7 +17,7 @@ const REVERTER: Address = Address::repeat_byte(0x43);
 const FRESH: Address = Address::repeat_byte(0x54);
 const DELEGATED: Address = Address::repeat_byte(0x65);
 const FUNDS: u128 = 10_000_000_000_000_000_000;
-/// EIP-8130 activates at Everest without the keystore, which Zenith adds.
+/// EIP-8130 activates at Everest; Zenith must behave the same.
 const UPGRADES: [BaseUpgrade; 2] = [BaseUpgrade::Everest, BaseUpgrade::Zenith];
 
 fn key(byte: u8) -> SigningKey {
@@ -36,8 +36,8 @@ fn signature(key: &SigningKey, hash: B256) -> Bytes {
     bytes.into()
 }
 
-fn transaction() -> TxEip8130 {
-    TxEip8130 {
+fn transaction() -> TxBase {
+    TxBase {
         chain_id: CHAIN_ID,
         gas_limit: 500_000,
         max_fee_per_gas: 1_000,
@@ -47,9 +47,9 @@ fn transaction() -> TxEip8130 {
     }
 }
 
-fn signed(tx: TxEip8130, sender: &SigningKey) -> Eip8130Signed {
+fn signed(tx: TxBase, sender: &SigningKey) -> TxBaseSigned {
     let auth = signature(sender, tx.sender_signature_hash());
-    Eip8130Signed::new(tx, auth, Bytes::new())
+    TxBaseSigned::new(tx, auth, Bytes::new())
 }
 
 fn compare(sender: Address, payer: Address) -> Compare {
@@ -80,23 +80,23 @@ fn seeds(sender: Address, payer: Address, code: Vec<u8>) -> Vec<Seed> {
     seeds
 }
 
-fn reference(signed: Eip8130Signed, sender: Address, simulated: bool) -> BaseTransaction<TxEnv> {
+fn reference(signed: TxBaseSigned, sender: Address, simulated: bool) -> BaseTransaction<TxEnv> {
     let encoded = Bytes::from(signed.encoded_2718());
     let base = TxEnv::builder().caller(sender).gas_limit(signed.tx().gas_limit).build_fill();
-    let mut parts = Eip8130TransactionParts::new(signed);
+    let mut parts = TxBaseTransactionParts::new(signed);
     if simulated {
-        parts.mode = Eip8130ExecutionMode::Simulate;
+        parts.mode = TxBaseExecutionMode::Simulate;
     }
     BaseTransaction {
         base,
         enveloped_tx: Some(encoded),
-        eip8130: Some(parts),
+        base_tx: Some(parts),
         ..Default::default()
     }
 }
 
 fn parity(
-    signed: Vec<Eip8130Signed>,
+    signed: Vec<TxBaseSigned>,
     sender: Address,
     payer: Address,
     seeds: &[Seed],
@@ -108,7 +108,7 @@ fn parity(
 /// Compares both engines at every upgrade. Without fee charging, gas-limit billing does not apply
 /// and the transactions report their metered gas.
 fn parity_with(
-    signed: Vec<Eip8130Signed>,
+    signed: Vec<TxBaseSigned>,
     sender: Address,
     payer: Address,
     seeds: &[Seed],
@@ -212,7 +212,7 @@ fn simulation_preserves_state_even_when_committed_and_prices_failure_gross_gas()
         let mut tx = transaction();
         tx.nonce_sequence = 73; // The simulation must not validate or increment this nonce.
         tx.calls[0][0].to = target;
-        let signed = Eip8130Signed::new(tx, Bytes::from(vec![0; 65]), Bytes::new());
+        let signed = TxBaseSigned::new(tx, Bytes::from(vec![0; 65]), Bytes::new());
         let outcome = parity(
             vec![signed],
             sender,
@@ -241,7 +241,7 @@ fn wrong_authentication_chain_id_and_nonce_are_rejected() {
             tx.nonce_sequence = 1;
         }
         let signed = if invalid == 0 {
-            Eip8130Signed::new(tx, Bytes::from(vec![0; 65]), Bytes::new())
+            TxBaseSigned::new(tx, Bytes::from(vec![0; 65]), Bytes::new())
         } else {
             signed(tx, &key)
         };
@@ -261,9 +261,9 @@ fn sponsor_pays_authentication_and_execution_without_debiting_sender() {
     let mut tx = transaction();
     tx.payer = Some(payer);
     let sender_auth = signature(&sender_key, tx.sender_signature_hash());
-    let mut payer_auth = Eip8130Constants::K1_AUTHENTICATOR.to_vec();
+    let mut payer_auth = TxBaseConstants::K1_AUTHENTICATOR.to_vec();
     payer_auth.extend_from_slice(&signature(&payer_key, tx.payer_signature_hash(sender)));
-    let signed = Eip8130Signed::new(tx, sender_auth, payer_auth.into());
+    let signed = TxBaseSigned::new(tx, sender_auth, payer_auth.into());
     let outcome = parity(vec![signed], sender, payer, &seeds(sender, payer, vec![0x00]), false);
     let Outcome::Executed { txs, accounts } = outcome else { panic!("sponsored AA rejected") };
     assert!(txs[0].success);
@@ -308,7 +308,7 @@ fn value_calls_delegated_targets_and_calldata_floor_parity() {
         }
     }
     for tx in [access, floor] {
-        let unsigned = Eip8130Signed::new(tx, Bytes::from(vec![0; 65]), Bytes::new());
+        let unsigned = TxBaseSigned::new(tx, Bytes::from(vec![0; 65]), Bytes::new());
         let outcome = parity(vec![unsigned], sender, sender, &seeds, true);
         let Outcome::Executed { txs, .. } = outcome else { panic!("simulation rejected") };
         assert!(txs[0].success);

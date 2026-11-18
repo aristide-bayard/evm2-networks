@@ -1,7 +1,7 @@
 //! Base precompiles.
 
 use alloy_primitives::{Address, address};
-use base_common_eip8130::NonceManagerSlots;
+use base_common_base_tx::NonceManagerSlots;
 use base_common_genesis::{BaseFeature, BaseUpgrade};
 use evm2::{
     Evm, Precompiles,
@@ -392,7 +392,7 @@ impl PrecompileProvider<BaseEvmTypes> for BasePrecompiles {
         PrecompileProvider::contains(&self.precompiles, address)
             || (self.spec.is_enabled_in(BaseUpgrade::Beryl) && b20_token_variant(address).is_some())
             || (*address == EIP8130_ROOT_ADDRESS
-                && self.spec.is_feature_enabled(BaseFeature::Eip8130))
+                && self.spec.is_feature_enabled(BaseFeature::TxBase))
     }
 
     fn move_precompiles(
@@ -410,7 +410,7 @@ impl PrecompileProvider<BaseEvmTypes> for BasePrecompiles {
     ) -> Option<Result<PrecompileOutput, PrecompileError>> {
         let upgrade = self.spec.upgrade();
         if message.code_address == EIP8130_ROOT_ADDRESS
-            && self.spec.is_feature_enabled(BaseFeature::Eip8130)
+            && self.spec.is_feature_enabled(BaseFeature::TxBase)
         {
             return Some(run_root(evm, message, gas));
         }

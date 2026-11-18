@@ -45,11 +45,11 @@ are not prewarmed. The factory itself stays code-less.
 
 The Cobalt transaction-context precompile (`0x8130…aa02`) reads the active precompile's `TxEnv`
 for ordinary transactions, raw messages, and system calls. Everest EIP-8130 preparation publishes
-the authenticated sender, payer, and acting actor through Base's transient transaction-context
+the authenticated sender and payer through Base's transient transaction-context
 storage. No origin is cached across executions.
 
-The EIP-8130 handler, active from Everest, shares Base's authentication, account-change, nonce,
-and intrinsic-gas rules; Zenith adds keystore authentication. Calls carry value and pay EIP-2929
+The EIP-8130 handler, active from Everest, shares Base's secp256k1 authentication, delegation,
+nonce, and intrinsic-gas rules. Calls carry value and pay EIP-2929
 access gas for every target but the first, plus Base's new-account charge. They execute on evm2
 in atomic phases: a failed phase rolls back its writes and skips later phases while retaining
 prior phases, consuming the nonce, and charging the payer. Receipts carry the number of committed

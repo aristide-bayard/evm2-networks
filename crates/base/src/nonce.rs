@@ -2,7 +2,7 @@
 
 use alloy_primitives::{Bytes, U256};
 use alloy_sol_types::{Panic, PanicKind, SolCall, SolError, SolInterface, sol};
-use base_common_eip8130::NonceManagerSlots;
+use base_common_base_tx::NonceManagerSlots;
 use evm2::{
     Evm, SpecId, Version,
     evm::precompile::PrecompileOutput,
@@ -48,13 +48,9 @@ pub(crate) fn run_nonce_manager(
     let selector = <[u8; 4]>::try_from(selector).expect("four bytes");
     let call = match Call::abi_decode_validate(input) {
         Ok(Call::getNonce(call)) => call,
-        Err(error) => {
-            let mut output = selector.to_vec();
-            if Call::valid_selector(selector) {
-                output.extend_from_slice(error.to_string().as_bytes());
-            }
-            return Err(PrecompileError::Revert(output.into()));
-        }
+        // The nonce manager activates after Cobalt, whose compact ABI decode errors carry the
+        // selector alone.
+        Err(_) => return Err(PrecompileError::Revert(Bytes::copy_from_slice(&selector))),
     };
     let Some(slot) = NonceManagerSlots::nonce_slot(call.account, call.nonceKey) else {
         return Err(PrecompileError::Revert(

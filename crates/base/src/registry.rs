@@ -1,8 +1,8 @@
 //! Base transaction registry.
 
 use alloy_consensus::{TxEip1559, TxEip2930, TxLegacy};
-use base_common_consensus::{DEPOSIT_TX_TYPE_ID, EIP8130_TX_TYPE_ID, TxDeposit};
-use base_common_genesis::BaseUpgrade;
+use base_common_consensus::{BASE_TX_TYPE_ID, DEPOSIT_TX_TYPE_ID, TxDeposit};
+use base_common_genesis::BaseFeature;
 use evm2::{
     SpecId, TxResult,
     ethereum::{LazyTxEip7702, TxEnvelope, eip1559, eip2930, eip7702, legacy},
@@ -35,7 +35,7 @@ fn as_eip7702(tx: &BaseTxEnvelope) -> Option<&LazyTxEip7702> {
 ///
 /// Registers the deposit handler (type `0x7e`) and the standard Ethereum handlers wired with
 /// [`BaseTxHandlerHooks`]: legacy, EIP-2930, EIP-1559, and, from Isthmus (Prague), EIP-7702.
-/// Zenith adds native EIP-8130 (type `0x79`) execution. EIP-4844 blob transactions are not
+/// Everest adds native EIP-8130 (type `0x79`) execution. EIP-4844 blob transactions are not
 /// supported on Base.
 pub fn base_tx_registry(spec: BaseSpecId) -> TxRegistry<BaseEvmTypes, TxResult<BaseEvmTypes>> {
     type Hooks = BaseTxHandlerHooks;
@@ -80,9 +80,9 @@ pub fn base_tx_registry(spec: BaseSpecId) -> TxRegistry<BaseEvmTypes, TxResult<B
             ),
         );
     }
-    if spec.is_enabled_in(BaseUpgrade::Zenith) {
+    if spec.is_feature_enabled(BaseFeature::TxBase) {
         registry.register(
-            EIP8130_TX_TYPE_ID,
+            BASE_TX_TYPE_ID,
             BaseTxEnvelope::as_eip8130,
             handler(prepare_eip8130, execute_eip8130),
         );
@@ -93,9 +93,9 @@ pub fn base_tx_registry(spec: BaseSpecId) -> TxRegistry<BaseEvmTypes, TxResult<B
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BaseEvmFactory, Eip8130Signed};
+    use crate::{BaseEvmFactory, BaseUpgrade, TxBaseSigned};
     use alloy_primitives::{Address, Bytes};
-    use base_common_consensus::{EIP8130_TX_TYPE_ID, TxEip8130};
+    use base_common_consensus::{BASE_TX_TYPE_ID, TxBase};
     use evm2::{env::BlockEnv, evm::InMemoryDB, registry::HandlerError};
 
     #[test]
@@ -111,15 +111,13 @@ mod tests {
             }
             assert_eq!(registry.contains(4), eip7702, "EIP-7702 at {upgrade:?}");
             assert!(!registry.contains(3), "EIP-4844 is not supported on Base");
-            assert!(!registry.contains(EIP8130_TX_TYPE_ID));
+            assert!(!registry.contains(BASE_TX_TYPE_ID));
         }
-        assert!(
-            base_tx_registry(BaseSpecId::new(BaseUpgrade::Zenith)).contains(EIP8130_TX_TYPE_ID)
-        );
+        assert!(base_tx_registry(BaseSpecId::new(BaseUpgrade::Everest)).contains(BASE_TX_TYPE_ID));
     }
 
     #[test]
-    fn eip8130_is_rejected_before_zenith() {
+    fn eip8130_is_rejected_before_everest() {
         let spec = BaseSpecId::new(BaseUpgrade::Denim);
         let factory = BaseEvmFactory::default();
         let mut evm = factory.create_evm(
@@ -128,12 +126,9 @@ mod tests {
             BlockEnv::<BaseEvmTypes>::default(),
             InMemoryDB::default(),
         );
-        let tx = BaseTxEnvelope::from(Eip8130Signed::new(
-            TxEip8130::default(),
-            Bytes::new(),
-            Bytes::new(),
-        ));
+        let tx =
+            BaseTxEnvelope::from(TxBaseSigned::new(TxBase::default(), Bytes::new(), Bytes::new()));
         let result = evm.transact(&tx.with_signer(Address::ZERO)).map(|tx| tx.discard());
-        assert_eq!(result, Err(HandlerError::UnsupportedTransactionType(EIP8130_TX_TYPE_ID)));
+        assert_eq!(result, Err(HandlerError::UnsupportedTransactionType(BASE_TX_TYPE_ID)));
     }
 }

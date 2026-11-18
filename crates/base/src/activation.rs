@@ -7,7 +7,7 @@
 
 use alloy_primitives::{Address, B256, Bytes, KECCAK256_EMPTY, Log, U256, b256, keccak256};
 use alloy_sol_types::{Panic, PanicKind, SolCall, SolError, SolEvent, SolInterface, sol};
-use base_common_genesis::BaseUpgrade;
+use base_common_genesis::{BaseFeature, BaseUpgrade};
 use evm2::{
     Evm, SpecId, Version,
     bytecode::Bytecode,
@@ -375,7 +375,10 @@ pub(crate) fn run_activation_registry(
         }
         Err(Error::AbiDecodeFailed { selector, error }) => {
             let mut bytes = selector.to_vec();
-            bytes.extend_from_slice(error.as_bytes());
+            // Cobalt compacts ABI decode failures to the selector alone.
+            if !upgrade.is_feature_enabled(BaseFeature::CompactAbiDecodeErrors) {
+                bytes.extend_from_slice(error.as_bytes());
+            }
             Err(PrecompileError::Revert(bytes.into()))
         }
     };

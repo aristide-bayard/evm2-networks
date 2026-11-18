@@ -1,8 +1,8 @@
 //! Base precompiles.
 
 use alloy_primitives::{Address, address};
-use base_common_eip8130::NonceManagerSlots;
-use base_common_genesis::BaseUpgrade;
+use base_common_base_tx::NonceManagerSlots;
+use base_common_genesis::{BaseFeature, BaseUpgrade};
 use evm2::{
     Evm, Precompiles,
     evm::precompile::{PrecompileOutput, PrecompileProvider},
@@ -62,7 +62,7 @@ pub const B20_FACTORY_ADDRESS: Address = address!("0xB20F00000000000000000000000
 ///
 /// Base's reference executor opens one inspector frame around an EIP-8130 transaction's calls.
 /// evm2 only fires call hooks around messages it dispatches, so an inspected transaction
-/// dispatches a root message to this address, which [`BasePrecompiles`] claims from Zenith on and
+/// dispatches a root message to this address, which [`BasePrecompiles`] claims from Everest on and
 /// which runs the calls as child frames. Outside an EIP-8130 root, calls to it succeed with empty
 /// output, like calls to an empty account. The address is neither listed nor prewarmed.
 pub const EIP8130_ROOT_ADDRESS: Address = address!("0x63779fdd96a819d4348ca621f0f539d68347ace2");
@@ -391,7 +391,8 @@ impl PrecompileProvider<BaseEvmTypes> for BasePrecompiles {
     fn contains(&self, address: &Address) -> bool {
         PrecompileProvider::contains(&self.precompiles, address)
             || (self.spec.is_enabled_in(BaseUpgrade::Beryl) && b20_token_variant(address).is_some())
-            || (*address == EIP8130_ROOT_ADDRESS && self.spec.is_enabled_in(BaseUpgrade::Zenith))
+            || (*address == EIP8130_ROOT_ADDRESS
+                && self.spec.is_feature_enabled(BaseFeature::TxBase))
     }
 
     fn move_precompiles(
@@ -409,7 +410,7 @@ impl PrecompileProvider<BaseEvmTypes> for BasePrecompiles {
     ) -> Option<Result<PrecompileOutput, PrecompileError>> {
         let upgrade = self.spec.upgrade();
         if message.code_address == EIP8130_ROOT_ADDRESS
-            && self.spec.is_enabled_in(BaseUpgrade::Zenith)
+            && self.spec.is_feature_enabled(BaseFeature::TxBase)
         {
             return Some(run_root(evm, message, gas));
         }

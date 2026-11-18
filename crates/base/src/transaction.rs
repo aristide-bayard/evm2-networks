@@ -22,7 +22,7 @@ use evm2::ethereum::{LazyTxEip7702, TxEnvelope};
 ///   EIP-7702), together with its EIP-2718 encoding, which prices the L1 data fee and the operator
 ///   fee.
 /// - [`Eip8130`](Self::Eip8130): a verified EIP-8130 account-abstraction transaction (type `0x79`,
-///   Zenith onwards). Unsigned RPC execution uses [`Self::Eip8130Simulation`] instead.
+///   Everest onwards). Unsigned RPC execution uses [`Self::Eip8130Simulation`] instead.
 ///
 /// EIP-4844 blob transactions are not supported on Base. A [`TxEnvelope::Eip4844`] wrapped in
 /// [`Standard`](Self::Standard) is rejected as an unsupported transaction type.

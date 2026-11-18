@@ -125,9 +125,10 @@ pub struct BaseTxResultExt {
     pub failed_deposit: bool,
     /// For deposits, the sender nonce before the deposit, as recorded in Canyon deposit receipts.
     pub deposit_nonce: Option<u64>,
-    /// EIP-8130 phase outcomes owned by this verified transaction. `None` for other transaction
-    /// types and unsigned simulations, including when the preceding transaction was EIP-8130.
-    pub eip8130_phase_statuses: Option<Vec<u8>>,
+    /// Number of leading EIP-8130 call phases that committed in this verified transaction. `None`
+    /// for other transaction types and unsigned simulations, including when the preceding
+    /// transaction was EIP-8130.
+    pub eip8130_committed_phases: Option<u64>,
 }
 
 /// Returns the evm2 [`Version`] for `spec` on chain `chain_id`.

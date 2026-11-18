@@ -146,7 +146,7 @@ pub fn evm2(env: Env, seeds: &[Seed]) -> BaseEvm<'static> {
         let mut info =
             evm2::AccountInfo { balance: seed.balance, nonce: seed.nonce, ..Default::default() };
         if !seed.code.is_empty() {
-            info.code = Some(Evm2Bytecode::new_legacy(Bytes::from(seed.code.clone())));
+            info.code = Some(Evm2Bytecode::new_raw(Bytes::from(seed.code.clone())));
         }
         db.insert_account_info(&seed.address, info);
         for (key, value) in &seed.storage {
@@ -197,7 +197,7 @@ pub fn run_revm_seq(
         let mut info =
             RevmAccountInfo { balance: seed.balance, nonce: seed.nonce, ..Default::default() };
         if !seed.code.is_empty() {
-            info.code = Some(RevmBytecode::new_legacy(Bytes::from(seed.code.clone())));
+            info.code = Some(RevmBytecode::new_raw(Bytes::from(seed.code.clone())));
             info.code_hash = info.code.as_ref().unwrap().hash_slow();
         }
         db.insert_account_info(seed.address, info);

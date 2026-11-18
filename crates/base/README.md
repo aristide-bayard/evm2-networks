@@ -44,16 +44,19 @@ are not prewarmed. The factory itself stays code-less.
 ## Transaction context and EIP-8130
 
 The Cobalt transaction-context precompile (`0x8130…aa02`) reads the active precompile's `TxEnv`
-for ordinary transactions, raw messages, and system calls. Zenith EIP-8130 preparation publishes
+for ordinary transactions, raw messages, and system calls. Everest EIP-8130 preparation publishes
 the authenticated sender, payer, and acting actor through Base's transient transaction-context
 storage. No origin is cached across executions.
 
-Zenith's EIP-8130 handler shares Base's authentication, account-change, nonce, and intrinsic-gas
-rules. Calls execute on evm2 in atomic phases: a failed phase rolls back its writes and skips
-later phases while retaining prior phases, consuming the nonce, and charging the payer. Receipts
-carry one status byte per phase. Unsigned simulation skips authentication, nonce advancement,
-and fees, searches a verified-feasible gas pool without exposing probes to inspectors, and
-discards all state even if its caller commits the result.
+The EIP-8130 handler, active from Everest, shares Base's authentication, account-change, nonce,
+and intrinsic-gas rules; Zenith adds keystore authentication. Calls carry value and pay EIP-2929
+access gas for every target but the first, plus Base's new-account charge. They execute on evm2
+in atomic phases: a failed phase rolls back its writes and skips later phases while retaining
+prior phases, consuming the nonce, and charging the payer. Receipts carry the number of committed
+phases. Under gas-limit billing, fee-charged transactions, EIP-8130 and standard alike, pay for
+their whole gas limit. Unsigned simulation skips authentication and fees, searches a
+verified-feasible gas pool without exposing probes to inspectors, and discards all state even if
+its caller commits the result.
 
 ## Not ported yet
 

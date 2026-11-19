@@ -41,7 +41,10 @@ pub const L1_PRICER_FUNDS_POOL_ADDRESS: Address =
 /// Returns whether `chain_id` is a known Arbitrum Nitro chain.
 ///
 /// Covers Arbitrum One, Nova and Sepolia, and the Robinhood Chain Orbit chains. Other Orbit chains
-/// run the same rules but are not recognized by ID.
+/// are not recognized by ID.
+///
+/// This only identifies the chain. Execution is checked against Arbitrum One only, so these rules
+/// apply to another chain only if its ArbOS version, batch poster and precompiles match.
 pub const fn is_arbitrum_chain(chain_id: u64) -> bool {
     matches!(
         chain_id,

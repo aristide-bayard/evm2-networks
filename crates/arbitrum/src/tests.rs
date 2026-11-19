@@ -6,7 +6,8 @@
 use crate::{
     ARB_INFO_ADDRESS, ARB_SYS_ADDRESS, ARBITRUM_ONE_CHAIN_ID, ARBOS_STATE_ADDRESS, ArbBlockEnv,
     ArbBlockEnvExt, ArbEvmFactory, ArbEvmTypes, ArbHeaderInfo, ArbOsVersion, ArbTxEnvelope,
-    BATCH_POSTER_ADDRESS, L1_PRICER_FUNDS_POOL_ADDRESS,
+    BATCH_POSTER_ADDRESS, L1_PRICER_FUNDS_POOL_ADDRESS, ROBINHOOD_MAINNET_CHAIN_ID,
+    is_arbitrum_chain,
     state::{ArbOsStorage, l1_pricing, l2_pricing, root},
 };
 use alloy_consensus::{TxEip1559, TxLegacy, transaction::Recovered};
@@ -56,6 +57,7 @@ mod op {
 /// Transaction and environment for one execution.
 struct Run {
     spec: ArbOsVersion,
+    chain_id: u64,
     coinbase: Address,
     tx: TxEnvelope,
     poster_gas: u64,
@@ -70,6 +72,7 @@ impl Run {
     fn new(spec: ArbOsVersion) -> Self {
         Self {
             spec,
+            chain_id: ARBITRUM_ONE_CHAIN_ID,
             coinbase: BATCH_POSTER_ADDRESS,
             tx: legacy(BASEFEE as u128, 1_000_000, TxKind::Call(CONTRACT), Vec::new()),
             poster_gas: 0,
@@ -136,7 +139,7 @@ impl Run {
             ext: ArbBlockEnvExt { l1_block_number: self.l1_block_number },
             ..Default::default()
         };
-        let version = factory.version(self.spec, ARBITRUM_ONE_CHAIN_ID);
+        let version = factory.version(self.spec, self.chain_id);
         let mut evm = factory.create_evm(self.spec, version, block, db);
         let tx = ArbTxEnvelope { tx: self.tx.clone(), poster_gas: self.poster_gas };
         let result = evm.transact(&Recovered::new_unchecked(tx, CALLER)).map(|tx| tx.commit());
@@ -416,8 +419,23 @@ fn arb_sys_returns_l2_block_and_version() {
     assert_eq!(block_number.tx_gas_used(), 21_000 + 4 * 16 + 803);
     let version = call(hex!("051038f2").to_vec());
     assert_eq!(U256::from_be_slice(&version.output), U256::from(55 + 61));
-    let chain_id = call(hex!("d127f54a").to_vec());
-    assert_eq!(U256::from_be_slice(&chain_id.output), U256::from(ARBITRUM_ONE_CHAIN_ID));
+    // Robinhood Chain is recognized and runs the same rules under its own chain ID.
+    for chain_id in [ARBITRUM_ONE_CHAIN_ID, ROBINHOOD_MAINNET_CHAIN_ID] {
+        assert!(is_arbitrum_chain(chain_id));
+        let mut run = Run::new(ArbOsVersion::V61);
+        run.chain_id = chain_id;
+        run.tx = TxEnvelope::Legacy(TxLegacy {
+            chain_id: Some(chain_id),
+            gas_price: BASEFEE as u128,
+            gas_limit: 100_000,
+            to: TxKind::Call(ARB_SYS_ADDRESS),
+            input: hex!("d127f54a").into(),
+            ..Default::default()
+        });
+        let result = run.exec(&[], &[]).0.unwrap();
+        assert_eq!(U256::from_be_slice(&result.output), U256::from(chain_id));
+        assert_eq!(result.tx_gas_used(), block_number.tx_gas_used());
+    }
 
     // `arbBlockHash` of the current block reverts with `InvalidBlockNumber(requested, current)`,
     // paying 3 gas per word of the argument and of the revert data.
@@ -437,6 +455,27 @@ fn arb_sys_returns_l2_block_and_version() {
     let unknown = call(hex!("deadbeef").to_vec());
     assert!(!unknown.status);
     assert_eq!(unknown.tx_gas_used(), 100_000);
+
+    // `myCallersAddressWithoutAliasing` returns no caller for the transaction itself.
+    let direct = call(hex!("d74523b3").to_vec());
+    assert_eq!(direct.output[..], Address::ZERO.into_word()[..]);
+    // With calldata, the contract calls `myCallersAddressWithoutAliasing` and returns the result:
+    // the sender for the top-level frame. Without calldata, it first calls itself with one byte.
+    let mut run = Run::new(ArbOsVersion::V61);
+    run.code = hex!(
+        "36601757" // CALLDATASIZE PUSH1 23 JUMPI
+        "60206000600160006000305af150" // CALL(GAS, ADDRESS, 0, 0, 1, 0, 32) POP
+        "60206000f3" // RETURN(0, 32)
+        "5b63d74523b3600052" // JUMPDEST MSTORE(0, selector)
+        "602060006004601c600060645af150" // CALL(GAS, ArbSys, 0, 28, 4, 0, 32) POP
+        "60206000f3" // RETURN(0, 32)
+    )
+    .to_vec();
+    run.tx = legacy(BASEFEE as u128, 100_000, TxKind::Call(CONTRACT), vec![1]);
+    assert_eq!(run.exec(&[], &[]).0.unwrap().output[..], CALLER.into_word()[..]);
+    // Nitro walks its call stack below the top-level frame, which is not ported.
+    run.tx = legacy(BASEFEE as u128, 100_000, TxKind::Call(CONTRACT), Vec::new());
+    assert!(matches!(run.exec(&[], &[]).0, Err(HandlerError::Fatal(_))));
 }
 
 #[test]

@@ -13,8 +13,10 @@
 //! ArbOS version that introduced it, so it is warm and its address has no code, as on Nitro.
 //! [`ArbSys`](ARB_SYS_ADDRESS), [`ArbInfo`](ARB_INFO_ADDRESS) and the getters of
 //! [`ArbGasInfo`](ARB_GAS_INFO_ADDRESS) are ported, and `ArbDebug` fails as on chains without debug
-//! mode. Calling any other ArbOS precompile or method aborts the transaction with a fatal
-//! [`ArbOsPrecompileUnsupported`] error rather than diverging silently.
+//! mode. `ArbSys.myCallersAddressWithoutAliasing` is ported only for calls from the transaction and
+//! its top-level frame. Calling any other ArbOS precompile or method, or that method from a deeper
+//! frame, aborts the transaction with a fatal [`ArbOsPrecompileUnsupported`] error rather than
+//! diverging silently.
 //!
 //! The ported methods follow Nitro's precompile framework (`precompiles/precompile.go`):
 //!
@@ -281,6 +283,7 @@ fn arb_sys(
         }
         C::arbChainID(_) => U256::from(evm.version().chain_id).abi_encode(),
         C::arbOSVersion(_) => U256::from(55 + version as u64).abi_encode(),
+        // Nitro has no storage gas and always returns 0.
         C::getStorageGasAvailable(_) => U256::ZERO.abi_encode(),
         C::isTopLevelCall(_) => (depth <= 1).abi_encode(),
         C::mapL1SenderContractAddressToL2Alias(call) => {
@@ -291,7 +294,9 @@ fn arb_sys(
         // Only Nitro's L1-to-L2 transaction types alias their sender.
         C::wasMyCallersAddressAliased(_) => false.abi_encode(),
         // The caller of the frame calling the precompile: none for a transaction calling `ArbSys`
-        // directly, the sender for the top-level frame.
+        // directly, the sender for the top-level frame. Deeper frames are not supported: Nitro
+        // walks its call stack for the caller of the calling frame, and a precompile here only
+        // sees its own message, so the transaction aborts instead of diverging.
         C::myCallersAddressWithoutAliasing(_) => match depth {
             0 => Address::ZERO.abi_encode(),
             1 => evm.ext().sender.abi_encode(),

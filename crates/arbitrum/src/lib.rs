@@ -3,8 +3,7 @@
 //! A port of Nitro's execution rules for signed Ethereum transactions onto evm2:
 //!
 //! - [`ArbOsVersion`]s, Nitro's hardfork identifiers, mapped onto the evm2 [`SpecId`](evm2::SpecId)
-//!   they inherit, and the chains running Nitro ([`is_arbitrum_chain`]), including the Robinhood
-//!   Chain Orbit chains.
+//!   they inherit, and the known chains running Nitro, by chain ID ([`is_arbitrum_chain`]).
 //! - Block metadata ([`ArbHeaderInfo`]) decoded from the header's `mixHash`: the L1 block number
 //!   and the ArbOS version.
 //! - Opcode overlays ([`ArbConfig`]): `NUMBER` and `BLOCKHASH` use L1 blocks, `GASPRICE` returns
@@ -36,9 +35,9 @@
 //!   EIP-3541 as in plain Ethereum.
 //! - The multi-dimensional gas model of ArbOS 60 and later: its constraint backlogs and the
 //!   multi-gas refund. Arbitrum One uses the single-gas constraint model.
-//! - The ArbOS precompiles other than `ArbSys`, `ArbInfo` and `ArbGasInfo`, and the `ArbSys`
-//!   methods sending L2-to-L1 messages, which abort the transaction with
-//!   [`ArbOsPrecompileUnsupported`].
+//! - The ArbOS precompiles other than `ArbSys`, `ArbInfo` and `ArbGasInfo`, the `ArbSys` methods
+//!   sending L2-to-L1 messages, and `ArbSys.myCallersAddressWithoutAliasing` called below the
+//!   top-level frame, which abort the transaction with [`ArbOsPrecompileUnsupported`].
 //! - Nitro's hardcoded list of reverted transactions and the block-level system calls (EIP-4788,
 //!   EIP-2935), which belong to block execution.
 

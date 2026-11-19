@@ -242,7 +242,7 @@ fn arb_sys(
     gas: &mut GasTracker,
 ) -> PrecompileResult {
     use IArbSys::IArbSysCalls as C;
-    let Ok(call) = C::abi_decode(&message.input) else { return Err(revert_all(gas)) };
+    let Ok(call) = C::abi_decode(evm.message_input(message)) else { return Err(revert_all(gas)) };
     let purity = match call {
         C::mapL1SenderContractAddressToL2Alias(_) => Purity::Pure,
         C::withdrawEth(_) | C::sendTxToL1(_) => Purity::Payable,
@@ -257,7 +257,7 @@ fn arb_sys(
     let version = evm.config_spec_id();
     // Call depth relative to the transaction's top-level frame (Nitro's `evm.Depth() - 1` inside
     // a precompile).
-    let depth = message.depth.saturating_sub(evm.version().initial_call_depth);
+    let depth = message.depth.saturating_sub(evm.initial_call_depth());
     let unsupported = |method| {
         PrecompileError::fatal(ArbOsPrecompileUnsupported {
             precompile: "ArbSys",
@@ -311,7 +311,7 @@ fn arb_info(
     gas: &mut GasTracker,
 ) -> PrecompileResult {
     use IArbInfo::IArbInfoCalls as C;
-    let Ok(call) = C::abi_decode(&message.input) else { return Err(revert_all(gas)) };
+    let Ok(call) = C::abi_decode(evm.message_input(message)) else { return Err(revert_all(gas)) };
     enter(message, gas, ARB_INFO_ADDRESS, Purity::View, true)?;
     let output = match call {
         C::getBalance(call) => {
@@ -338,7 +338,7 @@ fn arb_gas_info(
     gas: &mut GasTracker,
 ) -> PrecompileResult {
     use IArbGasInfo::IArbGasInfoCalls as C;
-    let Ok(call) = C::abi_decode(&message.input) else { return Err(revert_all(gas)) };
+    let Ok(call) = C::abi_decode(evm.message_input(message)) else { return Err(revert_all(gas)) };
     let version = evm.config_spec_id();
     let since = match call {
         C::getL1FeesAvailable(_) => ArbOsVersion::V10,

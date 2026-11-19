@@ -85,7 +85,7 @@ pub fn paid_gasprice(cx: _) -> out {
     *out = if host.config_spec_id().enables(ArbOsVersion::V3) {
         host.ext().paid_gas_price
     } else {
-        cx.state.tx().gas_price
+        host.tx_env().gas_price
     };
 }
 

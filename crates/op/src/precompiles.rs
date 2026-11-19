@@ -31,11 +31,11 @@ macro_rules! op_precompile {
         #[allow(non_snake_case)]
         $vis fn $name() -> Precompile<OpEvmTypes> {
             fn run(
-                _evm: &mut Evm<'_, OpEvmTypes>,
+                evm: &mut Evm<'_, OpEvmTypes>,
                 message: &Message<OpEvmTypes>,
                 gas: &mut GasTracker,
             ) -> PrecompileResult {
-                $f(message.input.as_ref(), gas)
+                $f(evm.message_input(message), gas)
             }
             Precompile::new($address, $id, run)
         }
@@ -312,7 +312,7 @@ mod tests {
     //! Vectors from op-revm's `precompiles.rs` tests.
 
     use super::*;
-    use alloy_primitives::hex;
+    use alloy_primitives::{Bytes, hex};
 
     const BN254_PAIR_ELEMENT_LEN: usize = 192;
 
@@ -360,7 +360,7 @@ mod tests {
         );
         let precompile = op_precompile_map(spec).get(&address).expect("installed");
         let message = Message::<OpEvmTypes> {
-            input: input.to_vec().into(),
+            input: Bytes::copy_from_slice(input).into(),
             code_address: address,
             ..Default::default()
         };

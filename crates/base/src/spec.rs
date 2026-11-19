@@ -1,6 +1,6 @@
 //! Base upgrade schedule for the evm2 execution type family.
 
-use base_common_genesis::BaseUpgrade;
+use base_common_genesis::{BaseFeature, BaseUpgrade};
 use evm2::SpecId;
 
 /// EVM-facing Base spec id.
@@ -32,6 +32,13 @@ impl BaseSpecId {
     /// Base upgrades are ordered by discriminant, matching `base_common_evm::BaseSpecId`.
     pub const fn is_enabled_in(self, other: BaseUpgrade) -> bool {
         other as u8 <= self.0 as u8
+    }
+
+    /// Returns whether `feature` is enabled at this spec.
+    ///
+    /// Mirrors `base_common_evm::BaseSpecId::is_feature_enabled`.
+    pub const fn is_feature_enabled(self, feature: BaseFeature) -> bool {
+        self.0.is_feature_enabled(feature)
     }
 
     /// Returns the evm2 spec that governs execution at this Base upgrade.
@@ -93,7 +100,7 @@ mod tests {
     use base_common_chains::BaseUpgradeExt;
     use revm::primitives::hardfork::SpecId as RevmSpecId;
 
-    const ALL: [BaseUpgrade; 16] = [
+    const ALL: [BaseUpgrade; 17] = [
         BaseUpgrade::Bedrock,
         BaseUpgrade::Regolith,
         BaseUpgrade::Canyon,
@@ -109,6 +116,7 @@ mod tests {
         BaseUpgrade::Beryl,
         BaseUpgrade::Cobalt,
         BaseUpgrade::Denim,
+        BaseUpgrade::Everest,
         BaseUpgrade::Zenith,
     ];
 

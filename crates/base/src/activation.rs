@@ -7,7 +7,7 @@
 
 use alloy_primitives::{Address, B256, Bytes, KECCAK256_EMPTY, Log, U256, b256, keccak256};
 use alloy_sol_types::{Panic, PanicKind, SolCall, SolError, SolEvent, SolInterface, sol};
-use base_common_genesis::BaseUpgrade;
+use base_common_genesis::{BaseFeature, BaseUpgrade};
 use evm2::{
     Evm, SpecId, Version,
     bytecode::Bytecode,
@@ -122,7 +122,7 @@ impl Ctx<'_, '_> {
     }
 
     fn gas(&self, id: GasId) -> u64 {
-        u64::from(self.params.get(id))
+        self.params.get(id)
     }
 
     fn sload(&mut self, key: U256) -> Result<U256> {
@@ -335,6 +335,8 @@ pub(crate) fn run_activation_registry(
         return Err(PrecompileError::Revert(DelegateCallNotAllowed {}.abi_encode().into()));
     }
 
+    // `Ctx` borrows the EVM mutably, so copy the input out first.
+    let input = Bytes::copy_from_slice(evm.message_input(message));
     let mut ctx = Ctx {
         evm,
         address: message.code_address,
@@ -350,9 +352,9 @@ pub(crate) fn run_activation_registry(
     let result = if upgrade as u8 >= BaseUpgrade::Cobalt as u8 && !message.value.is_zero() {
         Err(Error::revert(IActivationRegistry::NonPayable {}))
     } else {
-        let words = (message.input.len() as u64).div_ceil(32);
+        let words = (input.len() as u64).div_ceil(32);
         ctx.charge(words.saturating_mul(CALLDATA_WORD_GAS))
-            .and_then(|()| ctx.dispatch(&message.input, config))
+            .and_then(|()| ctx.dispatch(&input, config))
     };
 
     let (used, refund) = (ctx.used, ctx.refund);
@@ -373,7 +375,10 @@ pub(crate) fn run_activation_registry(
         }
         Err(Error::AbiDecodeFailed { selector, error }) => {
             let mut bytes = selector.to_vec();
-            bytes.extend_from_slice(error.as_bytes());
+            // Cobalt compacts ABI decode failures to the selector alone.
+            if !upgrade.is_feature_enabled(BaseFeature::CompactAbiDecodeErrors) {
+                bytes.extend_from_slice(error.as_bytes());
+            }
             Err(PrecompileError::Revert(bytes.into()))
         }
     };

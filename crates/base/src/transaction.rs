@@ -10,7 +10,7 @@ use alloy_eips::{
     eip7702::SignedAuthorization,
 };
 use alloy_primitives::{B256, Bytes, ChainId, Sealed, TxKind, U256};
-use base_common_consensus::{BaseTxEnvelope as BaseConsensusTxEnvelope, Eip8130Signed, TxDeposit};
+use base_common_consensus::{BaseTxEnvelope as BaseConsensusTxEnvelope, TxBaseSigned, TxDeposit};
 use evm2::ethereum::{LazyTxEip7702, TxEnvelope};
 
 /// The Base transaction envelope executed by [`BaseEvmTypes`](crate::BaseEvmTypes).
@@ -21,10 +21,8 @@ use evm2::ethereum::{LazyTxEip7702, TxEnvelope};
 /// - [`Standard`](Self::Standard): a standard Ethereum transaction (legacy, EIP-2930, EIP-1559,
 ///   EIP-7702), together with its EIP-2718 encoding, which prices the L1 data fee and the operator
 ///   fee.
-/// - [`Eip8130`](Self::Eip8130): an enshrined EIP-8130 account-abstraction transaction (type
-///   `0x79`, Zenith onwards). The envelope can represent it, but no execution handler is
-///   registered yet, so executing one returns
-///   [`HandlerError::UnsupportedTransactionType`](evm2::registry::HandlerError::UnsupportedTransactionType).
+/// - [`Eip8130`](Self::Eip8130): a verified EIP-8130 account-abstraction transaction (type `0x79`,
+///   Everest onwards). Unsigned RPC execution uses [`Self::Eip8130Simulation`] instead.
 ///
 /// EIP-4844 blob transactions are not supported on Base. A [`TxEnvelope::Eip4844`] wrapped in
 /// [`Standard`](Self::Standard) is rejected as an unsupported transaction type.
@@ -44,7 +42,14 @@ pub enum BaseTxEnvelope {
         enveloped: Bytes,
     },
     /// An enshrined EIP-8130 account-abstraction transaction.
-    Eip8130(Eip8130Signed),
+    Eip8130(TxBaseSigned),
+    /// Unsigned RPC simulation, without signature checks, nonce advancement, or fee settlement.
+    Eip8130Simulation {
+        /// Transaction body and representative authentication blobs for intrinsic gas pricing.
+        signed: TxBaseSigned,
+        /// Acting actor, or the sender's self-actor when omitted.
+        sender_actor_id: Option<B256>,
+    },
 }
 
 impl BaseTxEnvelope {
@@ -63,7 +68,7 @@ impl BaseTxEnvelope {
     pub const fn as_deposit(&self) -> Option<&TxDeposit> {
         match self {
             Self::Deposit(tx) => Some(tx),
-            Self::Standard { .. } | Self::Eip8130(_) => None,
+            Self::Standard { .. } | Self::Eip8130(_) | Self::Eip8130Simulation { .. } => None,
         }
     }
 
@@ -76,21 +81,21 @@ impl BaseTxEnvelope {
     pub const fn as_standard(&self) -> Option<&TxEnvelope> {
         match self {
             Self::Standard { tx, .. } => Some(tx),
-            Self::Deposit(_) | Self::Eip8130(_) => None,
+            Self::Deposit(_) | Self::Eip8130(_) | Self::Eip8130Simulation { .. } => None,
         }
     }
 
     /// Returns the EIP-8130 transaction, if this envelope is one.
-    pub const fn as_eip8130(&self) -> Option<&Eip8130Signed> {
+    pub const fn as_eip8130(&self) -> Option<&TxBaseSigned> {
         match self {
-            Self::Eip8130(tx) => Some(tx),
+            Self::Eip8130(tx) | Self::Eip8130Simulation { signed: tx, .. } => Some(tx),
             Self::Deposit(_) | Self::Standard { .. } => None,
         }
     }
 
     /// Returns whether this envelope is an EIP-8130 transaction.
     pub const fn is_eip8130(&self) -> bool {
-        matches!(self, Self::Eip8130(_))
+        matches!(self, Self::Eip8130(_) | Self::Eip8130Simulation { .. })
     }
 
     /// Returns the bytes the L1 data fee and the operator fee are priced over.
@@ -100,7 +105,7 @@ impl BaseTxEnvelope {
     pub fn enveloped(&self) -> &[u8] {
         match self {
             Self::Standard { enveloped, .. } => enveloped,
-            Self::Deposit(_) | Self::Eip8130(_) => &[],
+            Self::Deposit(_) | Self::Eip8130(_) | Self::Eip8130Simulation { .. } => &[],
         }
     }
 
@@ -117,6 +122,18 @@ impl BaseTxEnvelope {
     pub const fn with_signer(self, signer: alloy_primitives::Address) -> Recovered<Self> {
         Recovered::new_unchecked(self, signer)
     }
+
+    /// Marks an EIP-8130 envelope for unsigned RPC simulation. Other transaction types are
+    /// unchanged. The optional actor hint selects the post-account-change policy context.
+    pub fn set_eip8130_simulation(&mut self, sender_actor_id: Option<B256>) {
+        match self {
+            Self::Eip8130(signed) => {
+                *self = Self::Eip8130Simulation { signed: signed.clone(), sender_actor_id };
+            }
+            Self::Eip8130Simulation { sender_actor_id: hint, .. } => *hint = sender_actor_id,
+            _ => {}
+        }
+    }
 }
 
 impl From<TxDeposit> for BaseTxEnvelope {
@@ -131,8 +148,8 @@ impl From<Sealed<TxDeposit>> for BaseTxEnvelope {
     }
 }
 
-impl From<Eip8130Signed> for BaseTxEnvelope {
-    fn from(tx: Eip8130Signed) -> Self {
+impl From<TxBaseSigned> for BaseTxEnvelope {
+    fn from(tx: TxBaseSigned) -> Self {
         Self::Eip8130(tx)
     }
 }
@@ -155,7 +172,7 @@ impl From<BaseConsensusTxEnvelope> for BaseTxEnvelope {
             BaseConsensusTxEnvelope::Eip1559(tx) => tx.into(),
             BaseConsensusTxEnvelope::Eip7702(tx) => tx.into(),
             BaseConsensusTxEnvelope::Deposit(tx) => tx.into(),
-            BaseConsensusTxEnvelope::Eip8130(tx) => tx.into(),
+            BaseConsensusTxEnvelope::Base(tx) => tx.into(),
         }
     }
 }
@@ -190,7 +207,7 @@ macro_rules! delegate {
         match $self {
             Self::Deposit(tx) => tx.$method($($arg),*),
             Self::Standard { tx, .. } => tx.$method($($arg),*),
-            Self::Eip8130(tx) => tx.$method($($arg),*),
+            Self::Eip8130(tx) | Self::Eip8130Simulation { signed: tx, .. } => tx.$method($($arg),*),
         }
     };
 }
@@ -275,7 +292,7 @@ impl Transaction for BaseTxEnvelope {
 mod tests {
     use super::*;
     use alloy_primitives::{Address, Signature};
-    use base_common_consensus::{DEPOSIT_TX_TYPE_ID, EIP8130_TX_TYPE_ID, TxEip8130};
+    use base_common_consensus::{BASE_TX_TYPE_ID, DEPOSIT_TX_TYPE_ID, TxBase};
 
     fn sample_deposit() -> TxDeposit {
         TxDeposit {
@@ -297,13 +314,13 @@ mod tests {
 
     #[test]
     fn eip8130_reports_type_byte_and_gas_limit() {
-        let tx = Eip8130Signed::new(
-            TxEip8130 { gas_limit: 250_000, ..Default::default() },
+        let tx = TxBaseSigned::new(
+            TxBase { gas_limit: 250_000, ..Default::default() },
             Bytes::new(),
             Bytes::new(),
         );
         let envelope = BaseTxEnvelope::from(tx);
-        assert_eq!(envelope.ty(), EIP8130_TX_TYPE_ID);
+        assert_eq!(envelope.ty(), BASE_TX_TYPE_ID);
         assert!(envelope.is_eip8130());
         assert_eq!(envelope.gas_limit(), 250_000);
         assert!(envelope.as_standard().is_none());

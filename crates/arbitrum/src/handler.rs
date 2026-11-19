@@ -122,7 +122,7 @@ impl TxHandlerHooks<ArbEvmTypes> for ArbHandlerHooks {
         gas.result.gas.erase_cost(held_gas);
         let refund_counter = gas.result.gas.refunded().max(0) as u64;
         let mut result = finalize_gas(host, gas)?;
-        let quotient = u64::from(host.version().gas_params.get(GasId::MaxRefundQuotient)).max(1);
+        let quotient = host.version().gas_params.get(GasId::MaxRefundQuotient).max(1);
         result.refunded =
             refund_counter.min(result.total_gas_spent.saturating_sub(poster_gas) / quotient);
         result.ext = ArbTxResultExt { poster_gas, poster_fee, paid_gas_price };

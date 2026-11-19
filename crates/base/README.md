@@ -16,24 +16,50 @@ This crate ports the single-transaction execution semantics of the revm-based
 - [`deposit`] executes deposits, including failed deposits, which are flagged in
   [`BaseTxResultExt::failed_deposit`].
 - [`BasePrecompiles`] is the Base precompile set with its upgrade activation rules, including the
-  Beryl activation registry driven by the activation admin configuration and the Cobalt
-  nonce-manager `getNonce(address,uint256)` getter at `0x813000000000000000000000000000000000aa01`.
+  Beryl activation registry driven by the activation admin configuration, the Beryl B-20 factory,
+  B-20 tokens, and policy registry, and the Cobalt nonce-manager and transaction-context getters.
 - [`BaseEvmFactory`] builds configured [`BaseEvm`] instances.
 
-The handlers honor evm2's [`EvmFeatures`](evm2::EvmFeatures) like the stock Ethereum handlers.
-With `FEE_CHARGE` disabled, no gas, L1 data fee, or operator fee is charged or refunded.
+The standard transaction handlers honor evm2's [`EvmFeatures`](evm2::EvmFeatures) like the stock
+Ethereum handlers. With `FEE_CHARGE` disabled, no gas, L1 data fee, or operator fee is charged or
+refunded. Signed EIP-8130 inclusion always applies its protocol authentication and fee checks,
+matching Base's reference executor; unsigned RPC simulation is a separate envelope variant.
+
+## Beryl B-20 and policy precompiles
+
+The B-20 factory (`0xB20F…`), the B-20 tokens, and the policy registry (`0x8453…0002`) run Base's
+own storage dispatchers from `base-common-precompiles` (`B20FactoryStorage::dispatch`, the asset
+and stablecoin token dispatchers, and `PolicyRegistryStorage::dispatch`) rather than a port of
+their business logic. A crate-internal `PrecompileStorageProvider` implementation backs those
+dispatchers with evm2 state: storage, transient storage, logs, account and code access, and journal
+checkpoints map to evm2 state operations and native evm2 rollback, with the reference gas schedule,
+refunds, static-call and `DELEGATECALL`/`CALLCODE` rejection, and code-marker charging. revm data
+types cross that boundary, so revm is compiled as a dependency, but it never executes. Database
+failures stay fatal.
+
+B-20 tokens are resolved by address prefix from Beryl on, like the reference `BerylLookup`, after
+the fixed precompile table, so custom precompiles and relocations keep precedence. Token addresses
+are not prewarmed. The factory itself stays code-less.
+
+## Transaction context and EIP-8130
+
+The Cobalt transaction-context precompile (`0x8130…aa02`) reads the active precompile's `TxEnv`
+for ordinary transactions, raw messages, and system calls. Everest EIP-8130 preparation publishes
+the authenticated sender and payer through Base's transient transaction-context
+storage. No origin is cached across executions.
+
+The EIP-8130 handler, active from Everest, shares Base's secp256k1 authentication, delegation,
+nonce, and intrinsic-gas rules. Calls carry value and pay EIP-2929
+access gas for every target but the first, plus Base's new-account charge. They execute on evm2
+in atomic phases: a failed phase rolls back its writes and skips later phases while retaining
+prior phases, consuming the nonce, and charging the payer. Receipts carry the number of committed
+phases. Under gas-limit billing, fee-charged transactions, EIP-8130 and standard alike, pay for
+their whole gas limit. Unsigned simulation skips authentication and fees, searches a
+verified-feasible gas pool without exposing probes to inspectors, and discards all state even if
+its caller commits the result.
 
 ## Not ported yet
 
-- The Beryl B-20 factory and tokens and policy registry. They are built on
-  `base-precompile-storage`, which is tied to revm.
-- The Cobalt transaction-context precompile. Its ordinary-transaction getters require
-  `tx.origin`, but evm2's precompile interface does not expose the active `TxEnv`. Caching an
-  origin in the transaction handler would not cover raw message execution or system calls.
-- EIP-8130 execution (Zenith only, never scheduled on a real chain). The envelope can carry an
-  EIP-8130 transaction, but executing it returns an unsupported-transaction-type error.
-  Nonce mutation and expiring-nonce replay protection belong to that execution layer; the
-  nonce-manager precompile only exposes the read-only getter, as in the reference.
 - Block-level pieces: the block executor and the Canyon, Denim, and Zenith irregular state
   transitions.
 

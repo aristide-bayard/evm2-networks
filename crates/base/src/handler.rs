@@ -3,6 +3,7 @@
 use alloy_consensus::Transaction;
 use alloy_primitives::{Address, U256};
 use base_common_consensus::Predeploys;
+use base_common_genesis::BaseFeature;
 use evm2::{
     EvmFeatures, TxResult,
     ethereum::finalize_gas,
@@ -23,7 +24,8 @@ use crate::{BaseEvm, BaseEvmTypes, BaseTxEnvelope, L1BlockInfo};
 ///   [`EvmFeatures::FEE_CHARGE`] is disabled.
 /// - [`settle_transaction`](TxHandlerHooks::settle_transaction) refunds unused gas and the unused
 ///   operator fee (`reimburse_caller`), pays the coinbase the priority fee, and credits the L1 fee,
-///   base fee, and operator fee vaults (`reward_beneficiary`).
+///   base fee, and operator fee vaults (`reward_beneficiary`). Under gas-limit billing the whole
+///   gas limit is used (`post_execution`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BaseTxHandlerHooks;
 
@@ -67,6 +69,7 @@ impl TxHandlerHooks<BaseEvmTypes> for BaseTxHandlerHooks {
     ) -> HandlerResult<()> {
         Self::load_l1_block_info(host)?;
         let ext = host.ext_mut();
+        ext.tx_origin = caller;
         ext.clear_tx_l1_cost();
         ext.operator_fee_charged = U256::ZERO;
 
@@ -90,8 +93,9 @@ impl TxHandlerHooks<BaseEvmTypes> for BaseTxHandlerHooks {
         if balance_check {
             // The reference subtracts the L1 and operator fees first, then requires the remainder
             // to cover the maximum gas cost and the value (`LackOfFundForMaxFee`).
-            if balance < additional.saturating_add(max_upfront) {
-                return Err(HandlerError::InsufficientFunds);
+            let fee = additional.saturating_add(max_upfront);
+            if balance < fee {
+                return Err(HandlerError::InsufficientFunds { fee, balance });
             }
         } else if balance_top_up {
             // Extend evm2's balance top-up (see `validate_sender`) to the Base fees, so a sender
@@ -114,9 +118,17 @@ impl TxHandlerHooks<BaseEvmTypes> for BaseTxHandlerHooks {
         let gas_price = gas.gas_price;
         let gas_limit = gas.gas_limit;
         let mut result = finalize_gas(host, gas)?;
+        let spec = host.config_spec_id();
+        // Gas-limit billing (`BaseFeature::GasLimitBilling`) charges the whole gas limit, without
+        // a refund, whenever fees are charged.
+        if spec.is_feature_enabled(BaseFeature::GasLimitBilling)
+            && host.feature(EvmFeatures::FEE_CHARGE)
+        {
+            result.total_gas_spent = gas_limit;
+            result.refunded = 0;
+        }
         let gas_used = result.tx_gas_used();
         let basefee = host.block().basefee;
-        let spec = host.config_spec_id();
         let operator_fee = Self::operator_fee(host, envelope, gas_used);
 
         if host.feature(EvmFeatures::FEE_CHARGE) {

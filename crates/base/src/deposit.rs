@@ -66,6 +66,7 @@ pub fn prepare_deposit(
     let balance_check = host.feature(EvmFeatures::BALANCE_CHECK);
 
     let nonce = {
+        host.ext_mut().tx_origin = tx.from;
         let mut sender = host.state_mut().account(&tx.from)?;
         let nonce = sender.nonce();
         let mut balance = sender.balance().saturating_add(U256::from(tx.mint));
@@ -119,7 +120,7 @@ pub fn execute_deposit(
 
     let (execution_gas_limit, reservoir) =
         initial_gas_and_reservoir(host.version(), tx.gas_limit, intrinsic, 0);
-    let tx_env = TxEnvExt {
+    *host.tx_env_mut() = TxEnvExt {
         origin: tx.from,
         gas_price: U256::ZERO,
         chain_id: U256::from(host.version().chain_id),
@@ -129,8 +130,7 @@ pub fn execute_deposit(
         GasTracker::new_with_execution_gas_and_reservoir(execution_gas_limit, reservoir);
     let frame =
         prepare_initial_frame(host, tx.from, nonce, tx.to, &tx.input, tx.value, &mut tx_gas)?;
-    let result =
-        execute_initial_frame(host, &tx_env, frame, &mut tx_gas, execution_gas_limit, reservoir)?;
+    let result = execute_initial_frame(host, frame, &mut tx_gas, execution_gas_limit, reservoir)?;
 
     // The reference turns a halted deposit into `HaltedDepositPostRegolith`, which its
     // `catch_error` settles as a failed deposit. Its execution result classifies every stop other
@@ -148,7 +148,6 @@ pub fn execute_deposit(
             gas_limit: tx.gas_limit,
             floor_gas,
             initial_state_gas: 0,
-            state_refund: 0,
             result,
         },
     )?;

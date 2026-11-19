@@ -2,7 +2,7 @@
 
 use alloy_primitives::{Bytes, U256};
 use alloy_sol_types::{Panic, PanicKind, SolCall, SolError, SolInterface, sol};
-use base_common_eip8130::NonceManagerSlots;
+use base_common_base_tx::NonceManagerSlots;
 use evm2::{
     Evm, SpecId, Version,
     evm::precompile::PrecompileOutput,
@@ -38,22 +38,19 @@ pub(crate) fn run_nonce_manager(
     if !message.value.is_zero() {
         return Err(PrecompileError::Revert(INonceManager::NonPayable {}.abi_encode().into()));
     }
-    let words = (message.input.len() as u64).div_ceil(32);
+    let input = evm.message_input(message);
+    let words = (input.len() as u64).div_ceil(32);
     gas.spend(words.saturating_mul(6)).map_err(|_| PrecompileHalt::OutOfGas)?;
 
-    let Some(selector) = message.input.get(..4) else {
+    let Some(selector) = input.get(..4) else {
         return Err(PrecompileError::Revert(Bytes::from_static(&[0; 4])));
     };
     let selector = <[u8; 4]>::try_from(selector).expect("four bytes");
-    let call = match Call::abi_decode_validate(&message.input) {
+    let call = match Call::abi_decode_validate(input) {
         Ok(Call::getNonce(call)) => call,
-        Err(error) => {
-            let mut output = selector.to_vec();
-            if Call::valid_selector(selector) {
-                output.extend_from_slice(error.to_string().as_bytes());
-            }
-            return Err(PrecompileError::Revert(output.into()));
-        }
+        // The nonce manager activates after Cobalt, whose compact ABI decode errors carry the
+        // selector alone.
+        Err(_) => return Err(PrecompileError::Revert(Bytes::copy_from_slice(&selector))),
     };
     let Some(slot) = NonceManagerSlots::nonce_slot(call.account, call.nonceKey) else {
         return Err(PrecompileError::Revert(
@@ -64,9 +61,9 @@ pub(crate) fn run_nonce_manager(
     // The reference reads the canonical system account even if the precompile is relocated.
     let load = evm.sload(&NonceManagerSlots::ADDRESS, &slot, false)?;
     let params = &Version::base(SpecId::OSAKA).gas_params;
-    let mut cost = u64::from(params.get(GasId::WarmStorageReadCost));
+    let mut cost = params.get(GasId::WarmStorageReadCost);
     if load.is_cold {
-        cost += u64::from(params.get(GasId::ColdStorageAdditionalCost));
+        cost += params.get(GasId::ColdStorageAdditionalCost);
     }
     gas.spend(cost).map_err(|_| PrecompileHalt::OutOfGas)?;
 
